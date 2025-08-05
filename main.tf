@@ -28,7 +28,7 @@ data "aws_s3_bucket" "source_buckets" {
 
 # Use external data sources to get bucket configurations via AWS CLI (only when not in dry run)
 data "external" "source_versioning" {
-  for_each = var.dry_run ? {} : toset(var.source_bucket_names)
+  for_each = var.dry_run ? toset([]) : toset(var.source_bucket_names)
   program = ["bash", "-c", <<-EOT
     versioning_status=$(aws s3api get-bucket-versioning --bucket ${each.value} --query 'Status' --output text 2>/dev/null || echo "Disabled")
     if [ "$versioning_status" = "None" ] || [ "$versioning_status" = "" ]; then
@@ -40,7 +40,7 @@ data "external" "source_versioning" {
 }
 
 data "external" "source_encryption" {
-  for_each = var.dry_run ? {} : toset(var.source_bucket_names)
+  for_each = var.dry_run ? toset([]) : toset(var.source_bucket_names)
   program = ["bash", "-c", <<-EOT
     encryption=$(aws s3api get-bucket-encryption --bucket ${each.value} --query 'ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault' --output json 2>/dev/null || echo '{}')
     echo "{\"encryption\": $encryption}"
@@ -49,7 +49,7 @@ data "external" "source_encryption" {
 }
 
 data "external" "source_public_access_block" {
-  for_each = var.dry_run ? {} : toset(var.source_bucket_names)
+  for_each = var.dry_run ? toset([]) : toset(var.source_bucket_names)
   program = ["bash", "-c", <<-EOT
     pab=$(aws s3api get-public-access-block --bucket ${each.value} --query 'PublicAccessBlockConfiguration' --output json 2>/dev/null || echo '{"BlockPublicAcls": true, "IgnorePublicAcls": true, "BlockPublicPolicy": true, "RestrictPublicBuckets": true}')
     echo "{\"config\": $pab}"
