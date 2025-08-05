@@ -30,11 +30,11 @@ data "aws_s3_bucket" "source_buckets" {
 data "external" "source_versioning" {
   for_each = var.dry_run ? toset([]) : toset(var.source_bucket_names)
   program = ["bash", "-c", <<-EOT
-    versioning_status=$(aws s3api get-bucket-versioning --bucket ${each.value} --query 'Status' --output text 2>/dev/null || echo "Disabled")
-    if [ "$versioning_status" = "None" ] || [ "$versioning_status" = "" ]; then
+    versioning_status=$(aws s3api get-bucket-versioning --bucket ${each.value} --query 'Status' --output text 2>/dev/null)
+    if [ $? -ne 0 ] || [ "$versioning_status" = "None" ] || [ -z "$versioning_status" ]; then
       versioning_status="Disabled"
     fi
-    echo "{\"status\": \"$versioning_status\"}"
+    printf '{"status": "%s"}' "$versioning_status"
   EOT
   ]
 }
@@ -42,10 +42,11 @@ data "external" "source_versioning" {
 data "external" "source_encryption" {
   for_each = var.dry_run ? toset([]) : toset(var.source_bucket_names)
   program = ["bash", "-c", <<-EOT
-    encryption=$(aws s3api get-bucket-encryption --bucket ${each.value} --query 'ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault' --output json 2>/dev/null || echo '{}')
-    # Remove newlines and escape quotes properly
-    encryption_escaped=$(echo "$encryption" | tr -d '\n\r' | sed 's/"/\\"/g')
-    echo "{\"encryption\": \"$encryption_escaped\"}"
+    encryption=$(aws s3api get-bucket-encryption --bucket ${each.value} --query 'ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault' --output json 2>/dev/null)
+    if [ $? -ne 0 ] || [ -z "$encryption" ]; then
+      encryption='{}'
+    fi
+    printf '{"encryption": %s}' "$encryption"
   EOT
   ]
 }
@@ -53,10 +54,11 @@ data "external" "source_encryption" {
 data "external" "source_public_access_block" {
   for_each = var.dry_run ? toset([]) : toset(var.source_bucket_names)
   program = ["bash", "-c", <<-EOT
-    pab=$(aws s3api get-public-access-block --bucket ${each.value} --query 'PublicAccessBlockConfiguration' --output json 2>/dev/null || echo '{"BlockPublicAcls": true, "IgnorePublicAcls": true, "BlockPublicPolicy": true, "RestrictPublicBuckets": true}')
-    # Remove newlines and escape quotes properly
-    pab_escaped=$(echo "$pab" | tr -d '\n\r' | sed 's/"/\\"/g')
-    echo "{\"config\": \"$pab_escaped\"}"
+    pab=$(aws s3api get-public-access-block --bucket ${each.value} --query 'PublicAccessBlockConfiguration' --output json 2>/dev/null)
+    if [ $? -ne 0 ] || [ -z "$pab" ]; then
+      pab='{"BlockPublicAcls": true, "IgnorePublicAcls": true, "BlockPublicPolicy": true, "RestrictPublicBuckets": true}'
+    fi
+    printf '{"config": %s}' "$pab"
   EOT
   ]
 }
@@ -167,13 +169,13 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "new_bucket_encryp
   bucket   = each.value.id
 
   dynamic "rule" {
-    for_each = try(jsondecode(jsondecode(data.external.source_encryption[each.key].result.encryption)).SSEAlgorithm, null) != null ? [1] : []
+    for_each = try(jsondecode(data.external.source_encryption[each.key].result.encryption).SSEAlgorithm, null) != null ? [1] : []
     content {
       apply_server_side_encryption_by_default {
-        sse_algorithm     = try(jsondecode(jsondecode(data.external.source_encryption[each.key].result.encryption)).SSEAlgorithm, "AES256")
-        kms_master_key_id = try(jsondecode(jsondecode(data.external.source_encryption[each.key].result.encryption)).KMSMasterKeyID, null)
+        sse_algorithm     = try(jsondecode(data.external.source_encryption[each.key].result.encryption).SSEAlgorithm, "AES256")
+        kms_master_key_id = try(jsondecode(data.external.source_encryption[each.key].result.encryption).KMSMasterKeyID, null)
       }
-      bucket_key_enabled = try(jsondecode(jsondecode(data.external.source_encryption[each.key].result.encryption)).BucketKeyEnabled, null)
+      bucket_key_enabled = try(jsondecode(data.external.source_encryption[each.key].result.encryption).BucketKeyEnabled, null)
     }
   }
 }
@@ -191,10 +193,10 @@ resource "aws_s3_bucket_public_access_block" "new_bucket_pab" {
   for_each = var.dry_run ? {} : aws_s3_bucket.new_buckets
   bucket   = each.value.id
 
-  block_public_acls       = try(jsondecode(jsondecode(data.external.source_public_access_block[each.key].result.config)).BlockPublicAcls, true)
-  block_public_policy     = try(jsondecode(jsondecode(data.external.source_public_access_block[each.key].result.config)).BlockPublicPolicy, true)
-  ignore_public_acls      = try(jsondecode(jsondecode(data.external.source_public_access_block[each.key].result.config)).IgnorePublicAcls, true)
-  restrict_public_buckets = try(jsondecode(jsondecode(data.external.source_public_access_block[each.key].result.config)).RestrictPublicBuckets, true)
+  block_public_acls       = try(jsondecode(data.external.source_public_access_block[each.key].result.config).BlockPublicAcls, true)
+  block_public_policy     = try(jsondecode(data.external.source_public_access_block[each.key].result.config).BlockPublicPolicy, true)
+  ignore_public_acls      = try(jsondecode(data.external.source_public_access_block[each.key].result.config).IgnorePublicAcls, true)
+  restrict_public_buckets = try(jsondecode(data.external.source_public_access_block[each.key].result.config).RestrictPublicBuckets, true)
 }
 
 # Check if AWS CLI is available
