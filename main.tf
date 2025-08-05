@@ -43,7 +43,9 @@ data "external" "source_encryption" {
   for_each = var.dry_run ? toset([]) : toset(var.source_bucket_names)
   program = ["bash", "-c", <<-EOT
     encryption=$(aws s3api get-bucket-encryption --bucket ${each.value} --query 'ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault' --output json 2>/dev/null || echo '{}')
-    echo "{\"encryption\": $encryption}"
+    # Escape quotes and handle JSON properly
+    encryption_escaped=$(echo "$encryption" | sed 's/"/\\"/g')
+    echo "{\"encryption\": \"$encryption_escaped\"}"
   EOT
   ]
 }
@@ -52,7 +54,9 @@ data "external" "source_public_access_block" {
   for_each = var.dry_run ? toset([]) : toset(var.source_bucket_names)
   program = ["bash", "-c", <<-EOT
     pab=$(aws s3api get-public-access-block --bucket ${each.value} --query 'PublicAccessBlockConfiguration' --output json 2>/dev/null || echo '{"BlockPublicAcls": true, "IgnorePublicAcls": true, "BlockPublicPolicy": true, "RestrictPublicBuckets": true}')
-    echo "{\"config\": $pab}"
+    # Escape quotes and handle JSON properly
+    pab_escaped=$(echo "$pab" | sed 's/"/\\"/g')
+    echo "{\"config\": \"$pab_escaped\"}"
   EOT
   ]
 }
@@ -163,13 +167,13 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "new_bucket_encryp
   bucket   = each.value.id
 
   dynamic "rule" {
-    for_each = try(jsondecode(data.external.source_encryption[each.key].result.encryption).SSEAlgorithm, null) != null ? [1] : []
+    for_each = try(jsondecode(jsondecode(data.external.source_encryption[each.key].result.encryption)).SSEAlgorithm, null) != null ? [1] : []
     content {
       apply_server_side_encryption_by_default {
-        sse_algorithm     = try(jsondecode(data.external.source_encryption[each.key].result.encryption).SSEAlgorithm, "AES256")
-        kms_master_key_id = try(jsondecode(data.external.source_encryption[each.key].result.encryption).KMSMasterKeyID, null)
+        sse_algorithm     = try(jsondecode(jsondecode(data.external.source_encryption[each.key].result.encryption)).SSEAlgorithm, "AES256")
+        kms_master_key_id = try(jsondecode(jsondecode(data.external.source_encryption[each.key].result.encryption)).KMSMasterKeyID, null)
       }
-      bucket_key_enabled = try(jsondecode(data.external.source_encryption[each.key].result.encryption).BucketKeyEnabled, null)
+      bucket_key_enabled = try(jsondecode(jsondecode(data.external.source_encryption[each.key].result.encryption)).BucketKeyEnabled, null)
     }
   }
 }
@@ -187,10 +191,10 @@ resource "aws_s3_bucket_public_access_block" "new_bucket_pab" {
   for_each = var.dry_run ? {} : aws_s3_bucket.new_buckets
   bucket   = each.value.id
 
-  block_public_acls       = try(jsondecode(data.external.source_public_access_block[each.key].result.config).BlockPublicAcls, true)
-  block_public_policy     = try(jsondecode(data.external.source_public_access_block[each.key].result.config).BlockPublicPolicy, true)
-  ignore_public_acls      = try(jsondecode(data.external.source_public_access_block[each.key].result.config).IgnorePublicAcls, true)
-  restrict_public_buckets = try(jsondecode(data.external.source_public_access_block[each.key].result.config).RestrictPublicBuckets, true)
+  block_public_acls       = try(jsondecode(jsondecode(data.external.source_public_access_block[each.key].result.config)).BlockPublicAcls, true)
+  block_public_policy     = try(jsondecode(jsondecode(data.external.source_public_access_block[each.key].result.config)).BlockPublicPolicy, true)
+  ignore_public_acls      = try(jsondecode(jsondecode(data.external.source_public_access_block[each.key].result.config)).IgnorePublicAcls, true)
+  restrict_public_buckets = try(jsondecode(jsondecode(data.external.source_public_access_block[each.key].result.config)).RestrictPublicBuckets, true)
 }
 
 # Check if AWS CLI is available
