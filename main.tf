@@ -43,8 +43,8 @@ data "external" "source_encryption" {
   for_each = var.dry_run ? toset([]) : toset(var.source_bucket_names)
   program = ["bash", "-c", <<-EOT
     encryption=$(aws s3api get-bucket-encryption --bucket ${each.value} --query 'ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault' --output json 2>/dev/null || echo '{}')
-    # Escape quotes and handle JSON properly
-    encryption_escaped=$(echo "$encryption" | sed 's/"/\\"/g')
+    # Remove newlines and escape quotes properly
+    encryption_escaped=$(echo "$encryption" | tr -d '\n\r' | sed 's/"/\\"/g')
     echo "{\"encryption\": \"$encryption_escaped\"}"
   EOT
   ]
@@ -54,8 +54,8 @@ data "external" "source_public_access_block" {
   for_each = var.dry_run ? toset([]) : toset(var.source_bucket_names)
   program = ["bash", "-c", <<-EOT
     pab=$(aws s3api get-public-access-block --bucket ${each.value} --query 'PublicAccessBlockConfiguration' --output json 2>/dev/null || echo '{"BlockPublicAcls": true, "IgnorePublicAcls": true, "BlockPublicPolicy": true, "RestrictPublicBuckets": true}')
-    # Escape quotes and handle JSON properly
-    pab_escaped=$(echo "$pab" | sed 's/"/\\"/g')
+    # Remove newlines and escape quotes properly
+    pab_escaped=$(echo "$pab" | tr -d '\n\r' | sed 's/"/\\"/g')
     echo "{\"config\": \"$pab_escaped\"}"
   EOT
   ]
