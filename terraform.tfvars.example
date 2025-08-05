@@ -1,0 +1,23 @@
+# Example configuration for S3 bucket creation with dot-to-hyphen replacement
+
+aws_region = "us-east-1"
+
+# List your source bucket names here (dots will be replaced with hyphens)
+source_bucket_names = [
+  "my.company.logs",
+  "dev.application.data",
+  "prod.backup.files",
+  "staging.web.assets"
+]
+
+# Set to true to copy all data from source buckets to new buckets
+copy_data = true
+
+# Default tags for all resources
+default_tags = {
+  Environment = "production"
+  ManagedBy   = "terraform"
+  Project     = "s3-bucket-migration"
+  Team        = "infrastructure"
+  CostCenter  = "engineering"
+}
