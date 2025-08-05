@@ -58,7 +58,7 @@ data "external" "source_public_access_block" {
     if [ $? -ne 0 ] || [ -z "$pab" ]; then
       pab='{"BlockPublicAcls": true, "IgnorePublicAcls": true, "BlockPublicPolicy": true, "RestrictPublicBuckets": true}'
     fi
-    printf '{"config": %s}' "$pab"
+    printf '{"config": "%s"}' "$(echo "$pab" | jq -c . | sed 's/"/\\"/g')"
   EOT
   ]
 }
