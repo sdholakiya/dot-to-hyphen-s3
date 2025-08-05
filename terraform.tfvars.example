@@ -10,7 +10,11 @@ source_bucket_names = [
   "staging.web.assets"
 ]
 
-# Set to true to copy all data from source buckets to new buckets
+# Set to true for dry run mode - shows bucket mapping and configurations without creating resources
+# Set to false to actually create buckets and migrate data
+dry_run = true
+
+# Set to true to copy all data from source buckets to new buckets (ignored in dry run mode)
 copy_data = true
 
 # Default tags for all resources

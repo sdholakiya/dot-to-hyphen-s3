@@ -19,6 +19,12 @@ variable "copy_data" {
   default     = true
 }
 
+variable "dry_run" {
+  description = "When true, only shows bucket mapping and configurations without creating resources"
+  type        = bool
+  default     = false
+}
+
 variable "default_tags" {
   description = "Default tags to apply to all resources"
   type        = map(string)

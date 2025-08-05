@@ -4,13 +4,14 @@ This Terraform configuration creates new S3 buckets from a list of existing buck
 
 ## Features
 
+- **Dry Run Mode**: Preview bucket mapping and configurations without creating resources
 - **Dot-to-Hyphen Replacement**: Automatically replaces dots with hyphens in bucket names
 - **Settings Preservation**: Copies all bucket configurations from source buckets:
   - Versioning
   - Encryption
-  - Lifecycle policies
-  - CORS configuration
   - Public access block settings
+  - Lifecycle policies (manual configuration required)
+  - CORS configuration (manual configuration required)
 - **Data Migration**: Optionally copies all objects from source to new buckets
 - **Clear Mapping**: Outputs show original vs new bucket names
 
@@ -84,15 +85,32 @@ If you prefer using AWS Console credentials:
 
 ## Usage
 
-1. **Configure variables**:
+### Dry Run (Recommended First Step)
+
+1. **Configure variables for dry run**:
    ```bash
    cp terraform.tfvars.example terraform.tfvars
-   # Edit terraform.tfvars with your bucket names
+   # Edit terraform.tfvars with your bucket names and set dry_run = true
    ```
 
-2. **Initialize and apply**:
+2. **Run dry run to preview changes**:
    ```bash
    terraform init
+   terraform plan
+   terraform apply
+   ```
+
+   This will show you:
+   - Bucket name mappings (source → target)
+   - Current configurations of source buckets
+   - What will be copied/migrated
+   - No actual resources will be created
+
+### Full Migration
+
+3. **Run actual migration**:
+   ```bash
+   # Set dry_run = false in terraform.tfvars
    terraform plan
    terraform apply
    ```
@@ -185,7 +203,8 @@ If running from EC2 or Lambda, attach the above policy to the instance/function 
 ## Variables
 
 - `source_bucket_names`: List of existing bucket names (required)
-- `copy_data`: Whether to copy data (default: true)
+- `dry_run`: When true, shows preview without creating resources (default: false)
+- `copy_data`: Whether to copy data (default: true, ignored in dry run mode)
 - `aws_region`: AWS region (default: us-east-1)
 - `default_tags`: Tags for all resources
 
